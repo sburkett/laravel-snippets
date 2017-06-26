@@ -28,5 +28,4 @@
 
 	foreach($tokens as $t)
 		echo "$t\n";
-
 ?>
