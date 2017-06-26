@@ -19,16 +19,16 @@ class DomainWhitelist
      *
      * @var array
      */
-    protected $except = [
-			'team-config/tblive*',
+   protected $except = [
+       'some-URI/path*',
     ];
 
-		// List of approved domains. Can also come from a datasource if so you wish to modify the code to do so...
+	// List of approved domains. Can also come from a datasource if so you wish to modify the code to do so...
 
-		protected $approvedDomains = [
-			'somedomain.com',
-			'anotherdomain.com',
-		];
+	protected $approvedDomains = [
+		'somedomain.com',
+		'anotherdomain.com',
+	];
 
     /**
      * Determine if the request has a URI that should pass through CSRF verification.
@@ -52,45 +52,45 @@ class DomainWhitelist
     }
 
 
-		public function handle($request, closure $next)
+	public function handle($request, closure $next)
+	{
+		// Handle protected URIs
+		if($this->inExceptArray($request))
+			return $next($request);
+
+		// Verify request
+		$referer = $request->headers->get('referer');
+		$origin = $request->headers->get('origin');
+
+		if(!isset($referer) && !isset($origin))
+			return response()->json([ 'error' => 'Invalid token request' ], 403);
+
+		// We can only do this if we have both the headers - duh!
+		if(isset($referer) && isset($origin))
 		{
-			// Handle protected URIs
-			if($this->inExceptArray($request))
-				return $next($request);
+			$urlPartsReferer = parse_url($referer);
+			$urlPartsOrigin = parse_url($origin);
 
-			// Verify request
-			$referer = $request->headers->get('referer');
-			$origin = $request->headers->get('origin');
-
-			if(!isset($referer) && !isset($origin))
-				return response()->json([ 'error' => 'Invalid token request' ], 403);
-
-			// We can only do this if we have both the headers - duh!
-			if(isset($referer) && isset($origin))
+			$remoteDomainReferer = $urlPartsReferer['host'];
+			$remoteDomainOrigin = $urlPartsOrigin['host'];
+			
+			if($remoteDomainReferer != $remoteDomainOrigin)
 			{
-				$urlPartsReferer = parse_url($referer);
-				$urlPartsOrigin = parse_url($origin);
-
-				$remoteDomainReferer = $urlPartsReferer['host'];
-				$remoteDomainOrigin = $urlPartsOrigin['host'];
-
-				if($remoteDomainReferer != $remoteDomainOrigin)
-				{
-					return response()->json([ 'error' => 'Invalid token request' ], 403);
-				}
-
-				$domainArray = explode("\r\n", $settings->approved_domains);
-
-				// Trim the whitespace from all of the elements
-				$domainArray = array_map('trim', $domainArray);
-
-				// Final check!
-				if(!in_array($remoteDomainOrigin, $domainArray))
-				{
-					return response()->json([ 'error' => 'Invalid token request' ], 403);
-				}
+				return response()->json([ 'error' => 'Invalid token request' ], 403);
 			}
 
-			return $next($request);
+			$domainArray = explode("\r\n", $settings->approved_domains);
+
+			// Trim the whitespace from all of the elements
+			$domainArray = array_map('trim', $domainArray);
+
+			// Final check!
+			if(!in_array($remoteDomainOrigin, $domainArray))
+			{
+				return response()->json([ 'error' => 'Invalid token request' ], 403);
+			}
 		}
+
+		return $next($request);
+	}
 }
